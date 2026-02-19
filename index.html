@@ -159,6 +159,62 @@
       border-radius: 4px; border: 1px solid var(--border);
     }
 
+    /* FILTER SECTION */
+    .filter-section {
+      margin-bottom: 2.5rem;
+      padding: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .filter-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 0.75rem;
+    }
+    .tag-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .filter-tag {
+      font-size: 0.8rem;
+      background: var(--surface2);
+      color: var(--text2);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-tag:hover {
+      background: var(--bg3);
+      border-color: rgba(113,101,240,0.3);
+    }
+    .filter-tag.active {
+      background: rgba(113,101,240,0.2);
+      color: var(--accent2);
+      border-color: rgba(113,101,240,0.4);
+    }
+    .filter-tag .count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      opacity: 0.7;
+    }
+    .filter-tag.all {
+      background: rgba(94,234,212,0.15);
+      color: var(--accent3);
+      border-color: rgba(94,234,212,0.3);
+    }
+    .filter-tag.all.active {
+      background: rgba(94,234,212,0.25);
+      border-color: rgba(94,234,212,0.5);
+    }
+
     .loading {
       text-align: center; padding: 4rem 2rem;
       color: var(--text3); font-size: 0.95rem;
@@ -195,13 +251,13 @@
 
 <!-- NAV -->
 <nav id="navbar">
-  <a class="logo" href="이지희_포트폴리오_v2.html">
+  <a class="logo" href="blog.html">
     <div class="logo-icon">🍀</div>
     Zoe.ios
   </a>
   <ul class="nav-links" id="navLinks">
-    <li><a href="이지희_포트폴리오_v2.html">포트폴리오</a></li>
     <li><a href="blog.html" class="active">블로그</a></li>
+    <li><a href="https://github.com/Zoe0929" target="_blank">GitHub</a></li>
     <li><a href="mailto:mam07065@naver.com">연락하기</a></li>
   </ul>
   <button class="nav-toggle" id="navToggle" aria-label="메뉴">☰</button>
@@ -226,6 +282,14 @@
     </div>
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="검색..." />
+    </div>
+  </div>
+
+  <!-- 태그 필터 -->
+  <div class="filter-section" id="filterSection" style="display:none;">
+    <div class="filter-label">🏷️ 태그 필터</div>
+    <div class="tag-filters" id="tagFilters">
+      <!-- 동적으로 채워짐 -->
     </div>
   </div>
 
@@ -264,6 +328,7 @@
   const POSTS_FOLDER = 'posts';   // md 파일이 들어있는 폴더명
 
   let allPosts = [];
+  let currentFilter = 'all';
 
   async function fetchPosts() {
     try {
@@ -295,6 +360,7 @@
       // 날짜 기준 내림차순 정렬
       allPosts.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+      renderTagFilters();
       renderPosts(allPosts);
 
     } catch (error) {
@@ -351,12 +417,67 @@
     return { filename, date, slug, title, category, tags, excerpt, url };
   }
 
+  function renderTagFilters() {
+    // 모든 태그 수집
+    const tagCount = {};
+    allPosts.forEach(post => {
+      post.tags.forEach(tag => {
+        tagCount[tag] = (tagCount[tag] || 0) + 1;
+      });
+    });
+
+    const sortedTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
+
+    if (sortedTags.length === 0) return;
+
+    document.getElementById('filterSection').style.display = 'block';
+
+    const filtersHTML = `
+      <div class="filter-tag all active" onclick="filterByTag('all')">
+        전체 <span class="count">${allPosts.length}</span>
+      </div>
+      ${sortedTags.map(([tag, count]) => `
+        <div class="filter-tag" onclick="filterByTag('${tag}')">
+          #${tag} <span class="count">${count}</span>
+        </div>
+      `).join('')}
+    `;
+
+    document.getElementById('tagFilters').innerHTML = filtersHTML;
+  }
+
+  function filterByTag(tag) {
+    currentFilter = tag;
+
+    // 필터 버튼 활성화 상태 업데이트
+    document.querySelectorAll('.filter-tag').forEach(el => {
+      el.classList.remove('active');
+    });
+    event.target.closest('.filter-tag').classList.add('active');
+
+    // 포스트 필터링
+    let filtered = allPosts;
+    if (tag !== 'all') {
+      filtered = allPosts.filter(post => post.tags.includes(tag));
+    }
+
+    renderPosts(filtered);
+
+    // 검색창 초기화
+    document.getElementById('searchInput').value = '';
+  }
+
   function renderPosts(posts) {
     const grid = document.getElementById('postsGrid');
     document.getElementById('postCount').textContent = `${posts.length}개`;
 
     if (posts.length === 0) {
-      showEmpty();
+      grid.innerHTML = `
+        <div class="empty">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-text">검색 결과가 없습니다.</div>
+        </div>
+      `;
       return;
     }
 
@@ -391,11 +512,19 @@
   // 검색
   document.getElementById('searchInput').addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
-    const filtered = allPosts.filter(post =>
+    
+    // 현재 필터된 포스트에서 검색
+    let basePosts = allPosts;
+    if (currentFilter !== 'all') {
+      basePosts = allPosts.filter(post => post.tags.includes(currentFilter));
+    }
+
+    const filtered = basePosts.filter(post =>
       post.title.toLowerCase().includes(query) ||
       post.excerpt.toLowerCase().includes(query) ||
       post.tags.some(tag => tag.toLowerCase().includes(query))
     );
+    
     renderPosts(filtered);
   });
 
